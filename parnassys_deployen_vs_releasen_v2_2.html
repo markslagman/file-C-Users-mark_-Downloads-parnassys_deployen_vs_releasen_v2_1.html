@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deployen vs. Releasen — ParnasSys</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display&display=swap');
+
+:root {
+  --ps-magenta:       #C0166E;
+  --ps-magenta-mid:   #D94090;
+  --ps-magenta-light: #FAE8F2;
+  --ps-purple:        #5B2D8E;
+  --ps-purple-mid:    #7B44B8;
+  --ps-purple-light:  #EEE6F8;
+  --ps-blue:          #1A2B5F;
+  --ps-blue-mid:      #2B3F8A;
+  --ps-blue-light:    #E8ECF7;
+  --ps-orange:        #E8600A;
+  --ps-orange-light:  #FDF0E8;
+  --ps-white:         #FFFFFF;
+  --ps-offwhite:      #F8F7F9;
+  --ps-gray:          #6B6272;
+  --ps-gray-light:    #EDEAF0;
+  --ps-text:          #1A102E;
+  --ps-green:         #1A7A4A;
+  --ps-green-light:   #E6F4EC;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: linear-gradient(135deg, var(--ps-blue) 0%, var(--ps-purple) 50%, var(--ps-magenta) 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.presenter { width: 100%; max-width: 880px; }
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+
+.logo-area { display: flex; align-items: center; gap: 10px; }
+
+.logo-mark {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, var(--ps-magenta), var(--ps-purple));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-mark svg { width: 22px; height: 22px; }
+
+.logo-name { font-size: 16px; font-weight: 600; color: white; letter-spacing: 0.01em; }
+.logo-name em { font-style: normal; color: rgba(255,255,255,0.55); }
+
+/* Progress */
+.progress-track {
+  display: flex; gap: 6px; align-items: center;
+}
+.prog-seg {
+  height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.2);
+  transition: all 0.4s ease;
+  cursor: pointer;
+}
+.prog-seg.done { background: var(--ps-magenta-mid); }
+.prog-seg.active { background: white; }
+.prog-seg.future { width: 20px; }
+.prog-seg.done, .prog-seg.active { width: 32px; }
+
+/* Card */
+.card {
+  background: var(--ps-white);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 28px 80px rgba(0,0,0,0.4);
+}
+
+/* Card header: gradient shifts per slide via JS class */
+.card-header {
+  padding: 30px 40px 26px;
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg, var(--ps-magenta), var(--ps-purple)) 1;
+  position: relative;
+  overflow: hidden;
+}
+.card-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--ps-blue) 0%, var(--ps-purple) 70%, var(--ps-magenta) 130%);
+  z-index: 0;
+}
+.card-header > * { position: relative; z-index: 1; }
+
+.slide-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: rgba(255,255,255,0.55);
+  margin-bottom: 8px;
+}
+.card-header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 30px; font-weight: 400; color: white; line-height: 1.2;
+}
+.card-header .sub {
+  font-size: 14px; color: rgba(255,255,255,0.65);
+  margin-top: 7px; line-height: 1.6;
+}
+
+/* Body */
+.card-body {
+  padding: 30px 40px;
+  display: flex; flex-direction: column; gap: 16px;
+  min-height: 280px;
+}
+
+/* Slides */
+.slide { display: none; flex-direction: column; gap: 14px; animation: fadeUp 0.35s ease; }
+.slide.active { display: flex; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Two col */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.col-card {
+  border-radius: 14px; padding: 16px;
+  border: 1.5px solid transparent;
+}
+.col-card.deploy { background: var(--ps-blue-light); border-color: #C5CEE8; }
+.col-card.release { background: var(--ps-purple-light); border-color: #C9B8E8; }
+
+.col-head {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 12px;
+  padding: 4px 12px; border-radius: 6px;
+  display: inline-block; color: white;
+}
+.col-head.deploy { background: var(--ps-blue); }
+.col-head.release { background: var(--ps-purple); }
+
+.col-card ul { list-style: none; }
+.col-card ul li {
+  font-size: 13px; color: var(--ps-gray);
+  padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,0.07);
+  line-height: 1.5;
+}
+.col-card ul li:last-child { border-bottom: none; }
+.col-card ul li strong { color: var(--ps-text); font-weight: 600; }
+
+/* Info boxes */
+.info-box {
+  border-radius: 12px; padding: 14px 18px;
+  font-size: 14px; line-height: 1.65;
+}
+.info-box.note {
+  background: var(--ps-blue-light); color: var(--ps-blue-mid);
+  border-left: 3px solid var(--ps-blue-mid);
+}
+.info-box.tip {
+  background: var(--ps-green-light); color: #0D5C36;
+  border-left: 3px solid var(--ps-green);
+}
+.info-box.purple {
+  background: var(--ps-purple-light); color: var(--ps-purple);
+  border-left: 3px solid var(--ps-purple-mid);
+}
+.info-box.magenta {
+  background: var(--ps-magenta-light); color: var(--ps-magenta);
+  border-left: 3px solid var(--ps-magenta);
+}
+.info-box.warn {
+  background: #FDF0E8; color: #7A3008;
+  border-left: 3px solid var(--ps-orange);
+}
+
+/* Flag demo */
+.flag-demo { display: flex; flex-direction: column; gap: 10px; }
+.flag-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px; border-radius: 12px;
+  background: var(--ps-offwhite); border: 1.5px solid var(--ps-gray-light);
+  transition: background 0.25s, border-color 0.25s;
+}
+.flag-row.on-flag { background: var(--ps-purple-light); border-color: #C9B8E8; }
+
+.toggle-btn {
+  width: 48px; height: 27px; border-radius: 14px;
+  border: none; cursor: pointer; position: relative;
+  transition: background 0.25s; flex-shrink: 0;
+}
+.toggle-btn::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 21px; height: 21px; border-radius: 50%;
+  background: white; transition: transform 0.25s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.toggle-btn.off { background: #C5BDD0; }
+.toggle-btn.on  { background: var(--ps-purple); }
+.toggle-btn.on::after { transform: translateX(21px); }
+
+.flag-name { font-size: 14px; font-weight: 500; color: var(--ps-text); flex: 1; }
+.flag-badge {
+  font-size: 12px; font-weight: 600;
+  padding: 3px 12px; border-radius: 20px;
+}
+.flag-badge.vis { background: var(--ps-purple-light); color: var(--ps-purple); }
+.flag-badge.hid { background: var(--ps-gray-light); color: var(--ps-gray); }
+
+/* Routes */
+.route-card { border-radius: 14px; padding: 16px 18px; border: 1.5px solid transparent; }
+.route-card.a { background: var(--ps-blue-light); border-color: #C5CEE8; }
+.route-card.b { background: var(--ps-magenta-light); border-color: #E8B3D2; }
+
+.route-tag {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 10px;
+}
+.tag-badge {
+  display: inline-block; padding: 3px 12px; border-radius: 6px;
+  color: white; font-size: 11px; margin-right: 6px;
+}
+.tag-blue { background: var(--ps-blue); }
+.tag-magenta { background: var(--ps-magenta); }
+
+.flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.flow-step {
+  padding: 7px 13px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; text-align: center;
+}
+.flow-step.blue { background: var(--ps-blue-light); color: var(--ps-blue); }
+.flow-step.mag  { background: var(--ps-magenta-light); color: var(--ps-magenta); }
+.flow-step.grn  { background: var(--ps-green-light); color: var(--ps-green); }
+.flow-arrow { color: var(--ps-gray); font-size: 15px; }
+.route-note { font-size: 13px; color: var(--ps-gray); margin-top: 8px; line-height: 1.5; }
+
+/* Dept grid */
+.dept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dept-card {
+  border-radius: 12px; padding: 14px;
+  background: var(--ps-offwhite); border: 1.5px solid var(--ps-gray-light);
+}
+.dept-name {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.dept-name.mag { color: var(--ps-magenta); }
+.dept-name.pur { color: var(--ps-purple); }
+.dept-name.blu { color: var(--ps-blue); }
+.dept-name.org { color: var(--ps-orange); }
+.dept-card p { font-size: 13px; color: var(--ps-gray); line-height: 1.5; }
+
+/* Warn list */
+.warn-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.warn-list li {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: 14px; color: var(--ps-gray); line-height: 1.5;
+  padding: 10px 14px; border-radius: 10px;
+  background: var(--ps-offwhite); border: 1px solid var(--ps-gray-light);
+}
+.wi { font-size: 16px; flex-shrink: 0; }
+
+/* Summary */
+.sum-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.sum-list li {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: 14px; color: var(--ps-gray); line-height: 1.5;
+}
+.sum-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--ps-magenta), var(--ps-purple));
+  color: white; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+}
+.sum-list li strong { color: var(--ps-text); }
+
+/* Footer */
+.card-footer {
+  padding: 16px 40px;
+  border-top: 1.5px solid var(--ps-gray-light);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--ps-offwhite);
+}
+
+/* Audio controls */
+.audio-status {
+  display: flex; align-items: center; gap: 10px; flex: 1;
+}
+.audio-icon {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--ps-magenta), var(--ps-purple));
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.audio-icon svg { width: 16px; height: 16px; }
+
+.speech-bar {
+  flex: 1; display: flex; flex-direction: column; gap: 3px;
+}
+.speech-label {
+  font-size: 11px; font-weight: 600;
+  color: var(--ps-purple); letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.speech-wave {
+  display: flex; gap: 2px; align-items: center; height: 14px;
+}
+.wave-bar {
+  width: 3px; border-radius: 2px;
+  background: var(--ps-magenta-mid);
+  animation: none; transform-origin: bottom;
+}
+.wave-bar.anim { animation: wave 0.6s ease-in-out infinite alternate; }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.15s; }
+.wave-bar:nth-child(5) { animation-delay: 0.05s; }
+.wave-bar:nth-child(6) { animation-delay: 0.25s; }
+.wave-bar:nth-child(7) { animation-delay: 0.1s; }
+
+@keyframes wave {
+  from { height: 4px; }
+  to   { height: 13px; }
+}
+
+.ctrl-btn {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  padding: 8px 20px; border-radius: 8px;
+  border: 1.5px solid; cursor: pointer;
+  transition: all 0.15s;
+}
+.ctrl-btn.start {
+  border-color: var(--ps-purple);
+  background: linear-gradient(135deg, var(--ps-magenta), var(--ps-purple));
+  color: white;
+}
+.ctrl-btn.start:hover { opacity: 0.88; }
+.ctrl-btn.pause {
+  border-color: var(--ps-gray-light);
+  background: var(--ps-white); color: var(--ps-gray);
+}
+.ctrl-btn.pause:hover { background: var(--ps-gray-light); }
+
+.slide-counter { font-size: 13px; color: var(--ps-gray); font-weight: 500; margin-left: 16px; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .card-header { padding: 22px 22px 18px; }
+  .card-body { padding: 22px; }
+  .card-footer { padding: 14px 22px; }
+  .card-header h1 { font-size: 23px; }
+  .two-col { grid-template-columns: 1fr; }
+  .dept-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="presenter">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo-area">
+      <div class="logo-mark">
+        <svg viewBox="0 0 22 22" fill="none"><path d="M11 2L3 8V20H9V14H13V20H19V8L11 2Z" fill="white"/></svg>
+      </div>
+      <div class="logo-name">Parnas<em>Sys</em></div>
+    </div>
+    <div class="progress-track" id="progTrack"></div>
+  </div>
+
+  <div class="card">
+    <!-- Header -->
+    <div class="card-header" id="cardHeader">
+      <div class="slide-label" id="slideLabel">Introductie — 1 van 6</div>
+      <h1 id="slideTitle">Deployen ≠ Releasen</h1>
+      <p class="sub" id="slideSub">We praten vaak langs elkaar heen. Hier is het verschil — en waarom het goed nieuws is.</p>
+    </div>
+
+    <!-- Body -->
+    <div class="card-body">
+
+      <!-- Slide 0 -->
+      <div class="slide active" id="s0">
+        <div class="two-col">
+          <div class="col-card deploy">
+            <div class="col-head deploy">Deployen</div>
+            <ul>
+              <li><strong>Wat:</strong> Code naar de server sturen</li>
+              <li><strong>Zichtbaar:</strong> Nee — onder de motorkap</li>
+              <li><strong>Frequentie:</strong> Dagelijks of wekelijks</li>
+              <li><strong>Impact klant:</strong> Geen</li>
+              <li><strong>Doel:</strong> Technische validatie</li>
+            </ul>
+          </div>
+          <div class="col-card release">
+            <div class="col-head release">Releasen</div>
+            <ul>
+              <li><strong>Wat:</strong> Nieuwe functie beschikbaar maken</li>
+              <li><strong>Zichtbaar:</strong> Ja — klant ziet het</li>
+              <li><strong>Frequentie:</strong> Gepland, op juist moment</li>
+              <li><strong>Impact klant:</strong> Hoog</li>
+              <li><strong>Doel:</strong> Waarde voor eindgebruiker</li>
+            </ul>
+          </div>
+        </div>
+        <div class="info-box note">
+          Het kernidee: deployen en releasen zijn twee aparte stappen met elk een eigen tempo en doel. Dit haalt de druk weg.
+        </div>
+      </div>
+
+      <!-- Slide 1 -->
+      <div class="slide" id="s1">
+        <div class="flag-demo">
+          <div class="flag-row" id="fr1">
+            <button class="toggle-btn off" id="t1" onclick="toggleFlag(1)"></button>
+            <span class="flag-name">Nieuw rapport-scherm</span>
+            <span class="flag-badge hid" id="fb1">Verborgen</span>
+          </div>
+          <div class="flag-row on-flag" id="fr2">
+            <button class="toggle-btn on" id="t2" onclick="toggleFlag(2)"></button>
+            <span class="flag-name">Verbeterde zoekbalk</span>
+            <span class="flag-badge vis" id="fb2">Zichtbaar</span>
+          </div>
+          <div class="flag-row" id="fr3">
+            <button class="toggle-btn off" id="t3" onclick="toggleFlag(3)"></button>
+            <span class="flag-name">Nieuwe beoordelingstool</span>
+            <span class="flag-badge hid" id="fb3">Verborgen</span>
+          </div>
+        </div>
+        <div class="info-box purple">
+          De code staat al op de server — jij bepaalt wanneer de klant het ziet. Dit haalt de stress van het deployment-moment volledig weg.
+        </div>
+      </div>
+
+      <!-- Slide 2 -->
+      <div class="slide" id="s2">
+        <div class="route-card a">
+          <div class="route-tag"><span class="tag-badge tag-blue">Route A</span> Bugfix — direct live</div>
+          <div class="flow">
+            <div class="flow-step blue">Code klaar</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step blue">Direct deployen</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step grn">Klant merkt het meteen</div>
+          </div>
+          <p class="route-note">Geen nieuwsbrief of kennisbank nodig. De pijn is gewoon weg.</p>
+        </div>
+        <div class="route-card b">
+          <div class="route-tag"><span class="tag-badge tag-magenta">Route B</span> Nieuwe feature — gepland</div>
+          <div class="flow">
+            <div class="flow-step blue">Code klaar</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step mag">Vlag UIT — voorbereiden</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step grn">Vlag AAN op goed moment</div>
+          </div>
+          <p class="route-note">Communicatie en training klaar vóórdat de klant iets ziet. Geen toetsweken of rapportperiodes verstoren.</p>
+        </div>
+      </div>
+
+      <!-- Slide 3 -->
+      <div class="slide" id="s3">
+        <div class="dept-grid">
+          <div class="dept-card">
+            <div class="dept-name blu">Tech</div>
+            <p>Kan overdag deployen in kleine stapjes, zonder 'big bang'-paniek of downtime-risico's.</p>
+          </div>
+          <div class="dept-card">
+            <div class="dept-name pur">UX</div>
+            <p>Zet de vlag aan voor één testschool — snelle experimenten zonder de massa te verstoren.</p>
+          </div>
+          <div class="dept-card">
+            <div class="dept-name mag">Servicedesk</div>
+            <p>Heeft tijd om nieuwe functionaliteit rustig intern te testen, ver weg van live-klantdruk.</p>
+          </div>
+          <div class="dept-card">
+            <div class="dept-name org">Sales & Marketing</div>
+            <p>Tijd voor release notes en communicatie — klaar vóórdat de vlag massaal omgaat.</p>
+          </div>
+        </div>
+        <div class="info-box tip">
+          Resultaat: minder spoedberichten, minder verrassingen, meer vertrouwen bij de klant.
+        </div>
+      </div>
+
+      <!-- Slide 4 -->
+      <div class="slide" id="s4">
+        <div class="info-box warn">
+          Elke vlag voegt complexiteit toe aan de code. Een vlag die voor iedereen aan staat en nooit wordt opgeruimd, wordt technische rommel.
+        </div>
+        <ul class="warn-list">
+          <li><span class="wi">📋</span><span><strong>Vlag aangemaakt?</strong> Leg datum en eigenaar direct vast.</span></li>
+          <li><span class="wi">✅</span><span><strong>Volledig uitgerold?</strong> Verwijder de vlag dan uit de code — niet laten slingeren.</span></li>
+          <li><span class="wi">📌</span><span><strong>Definition of Done</strong> bevat als vaste stap: "vlag opgeruimd uit de code".</span></li>
+        </ul>
+        <div class="info-box magenta">
+          Het verplaatsen van controle vereist nieuwe discipline — maar de opbrengst is groter dan de inspanning.
+        </div>
+      </div>
+
+      <!-- Slide 5 -->
+      <div class="slide" id="s5">
+        <ul class="sum-list">
+          <li><div class="sum-num">1</div><span><strong>Deployen ≠ releasen.</strong> Twee aparte stappen, elk hun eigen tempo en doel.</span></li>
+          <li><div class="sum-num">2</div><span><strong>Feature flags</strong> zijn de schakelaar: code gaat live, klant ziet niets totdat jij het wil.</span></li>
+          <li><div class="sum-num">3</div><span><strong>Bugfixes</strong> gaan direct live — geen communicatie nodig, snelle pijnbestrijding.</span></li>
+          <li><div class="sum-num">4</div><span><strong>Nieuwe features</strong> worden pas gereleased als iedereen klaar is — op het juiste schoolmoment.</span></li>
+          <li><div class="sum-num">5</div><span><strong>Opruimen is verplicht</strong> — een uitgerolde vlag hoort uit de code.</span></li>
+        </ul>
+        <div class="info-box tip">
+          Het doel is niet meer werk — het is slimmer werk. Minder brandjes, meer controle, betere ervaring voor scholen.
+        </div>
+      </div>
+
+    </div><!-- /card-body -->
+
+    <!-- Footer -->
+    <div class="card-footer">
+      <div class="audio-status">
+        <div class="audio-icon" id="audioIcon">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 1L4 5H1V11H4L8 15V1Z" fill="white"/>
+            <path id="wave1" d="M11 5.5C12.1 6.5 12.8 7.9 12.8 9.5C12.8 11.1 12.1 12.5 11 13.5" stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.4"/>
+            <path id="wave2" d="M13.5 3C15.2 4.6 16.3 6.9 16.3 9.5C16.3 12.1 15.2 14.4 13.5 16" stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.2"/>
+          </svg>
+        </div>
+        <div class="speech-bar">
+          <div class="speech-label" id="speechLabel">Klaar om af te spelen</div>
+          <div class="speech-wave">
+            <div class="wave-bar" id="wb1" style="height:4px"></div>
+            <div class="wave-bar" id="wb2" style="height:4px"></div>
+            <div class="wave-bar" id="wb3" style="height:4px"></div>
+            <div class="wave-bar" id="wb4" style="height:4px"></div>
+            <div class="wave-bar" id="wb5" style="height:4px"></div>
+            <div class="wave-bar" id="wb6" style="height:4px"></div>
+            <div class="wave-bar" id="wb7" style="height:4px"></div>
+          </div>
+        </div>
+      </div>
+      <button class="ctrl-btn start" id="ctrlBtn" onclick="startShow()">▶ Afspelen</button>
+      <div class="slide-counter" id="counter">1 / 6</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ────────────────────────────────────────────────────────────────────
+var slides = [
+  {
+    label: "Introductie — 1 van 6",
+    title: "Deployen ≠ Releasen",
+    sub:   "We praten vaak langs elkaar heen. Hier is het verschil — en waarom het goed nieuws is.",
+    speech: "Welkom bij deze uitleg over deployen en releasen. Dit zijn twee begrippen die we vaak door elkaar gebruiken bij ParnasSys — maar ze betekenen iets heel anders. Deployen is puur technisch: je stuurt code naar de server. De klant merkt er niets van. Releasen is functioneel: je maakt nieuwe functionaliteit beschikbaar voor de klant. Dat vraagt om communicatie en planning. Het goede nieuws? Doordat dit twee aparte stappen zijn, hoef je ze niet meer tegelijk te doen — en dat haalt veel druk weg.",
+    delay: 20000
+  },
+  {
+    label: "De schakelaar — 2 van 6",
+    title: "Wat is een Feature Flag?",
+    sub:   "Een digitale schakelaar tussen je code en de klant.",
+    speech: "De sleutel tot het scheiden van deployen en releasen is de zogeheten feature flag. Dat is een digitale schakelaar. Stel je voor: je hebt een nieuw scherm gebouwd in ParnasSys. De code staat al op de server — maar de klant ziet er nog niets van, omdat de feature flag uitstaat. Zodra jij — of je team — de vlag aanzet, wordt de functie zichtbaar. Je bepaalt zelf wanneer dat gebeurt. Dit haalt de stress volledig van het deployment-moment.",
+    delay: 20000
+  },
+  {
+    label: "De praktijk — 3 van 6",
+    title: "Twee routes in de werkpraktijk",
+    sub:   "Elke aanpassing volgt automatisch één van twee paden.",
+    speech: "In de dagelijkse praktijk volgt elke aanpassing één van twee routes. Route A is voor bugfixes: de code gaat direct live. De klant merkt de verbetering meteen, zonder dat er een nieuwsbrief of kennisbank-pagina voor nodig is. Route B is voor nieuwe features: de code wordt deployed met de vlag uit. Vervolgens hebben UX, Servicedesk, en Sales en Marketing de tijd om alles voor te bereiden. Op het juiste moment — buiten toetsweken en rapportperiodes — gaat de vlag aan en is de release een gecontroleerde stap.",
+    delay: 22000
+  },
+  {
+    label: "Voordelen — 4 van 6",
+    title: "Wat levert het elke afdeling op?",
+    sub:   "De feature flag geeft iedereen meer rust en controle.",
+    speech: "De voordelen zijn voor elke afdeling anders maar even concreet. Tech kan overdag frequent deployen in kleine stapjes, zonder angst voor downtime. UX kan één testschool de nieuwe functie alvast laten zien, zonder de rest te verstoren. De servicedesk heeft rustig de tijd om te oefenen vóórdat de eerste klant belt. En Sales en Marketing krijgen de ruimte om release notes en communicatie perfect klaar te zetten. Het resultaat: minder spoedberichten, minder verrassingen, meer vertrouwen bij de klant.",
+    delay: 22000
+  },
+  {
+    label: "Aandachtspunt — 5 van 6",
+    title: "Feature flags zijn geen magie",
+    sub:   "Ze zijn krachtig, maar vragen discipline.",
+    speech: "Een belangrijk aandachtspunt: feature flags zijn niet gratis. Elke vlag voegt een klein stukje complexiteit toe aan de code. Als je tientallen vlaggen hebt die nooit worden opgeruimd, wordt dat een probleem — we noemen dat technische schuld. De spelregel is simpel: leg bij elke vlag de eigenaar en aanmaakdatum vast. Zodra een feature voor iedereen aan staat, verwijder je de vlag uit de code. En je voegt dit als vaste stap toe aan de Definition of Done. Op die manier blijft het systeem beheersbaar.",
+    delay: 22000
+  },
+  {
+    label: "Samenvatting — 6 van 6",
+    title: "De kern in vijf punten",
+    sub:   "Dit is hoe we vaker én veiliger deployen bij ParnasSys.",
+    speech: "Tot slot de samenvatting. Punt één: deployen is niet hetzelfde als releasen — het zijn twee aparte stappen. Punt twee: feature flags zijn de schakelaar ertussen. Code gaat live, de klant ziet niets totdat jij het wil. Punt drie: bugfixes gaan direct live, geen communicatie nodig. Punt vier: nieuwe features worden released op het juiste moment, als iedereen klaar is. Punt vijf: opruimen is verplicht — een uitgerolde vlag hoort uit de code. Het doel is niet méér werk, maar slimmer werk. Minder brandjes, meer controle, en een betere ervaring voor onze scholen. Bedankt voor het kijken!",
+    delay: 24000
+  }
+];
+
+var cur = 0;
+var total = slides.length;
+var playing = false;
+var paused = false;
+var slideTimer = null;
+var synth = window.speechSynthesis;
+var flags = {1:false, 2:true, 3:false};
+
+// ── PROGRESS ────────────────────────────────────────────────────────────────
+function buildProgress() {
+  var t = document.getElementById('progTrack');
+  t.innerHTML = '';
+  for (var i = 0; i < total; i++) {
+    var d = document.createElement('div');
+    d.className = 'prog-seg ' + (i < cur ? 'done' : i === cur ? 'active' : 'future');
+    (function(idx){ d.onclick = function(){ if(playing||paused) jumpTo(idx); }; })(i);
+    t.appendChild(d);
+  }
+}
+
+// ── SHOW SLIDE ───────────────────────────────────────────────────────────────
+function showSlide(n) {
+  for (var i = 0; i < total; i++) {
+    document.getElementById('s'+i).classList.remove('active');
+  }
+  document.getElementById('s'+n).classList.add('active');
+  document.getElementById('slideLabel').textContent = slides[n].label;
+  document.getElementById('slideTitle').textContent = slides[n].title;
+  document.getElementById('slideSub').textContent   = slides[n].sub;
+  document.getElementById('counter').textContent    = (n+1) + ' / ' + total;
+  buildProgress();
+}
+
+// ── SPEECH ──────────────────────────────────────────────────────────────────
+function setWave(on) {
+  var bars = document.querySelectorAll('.wave-bar');
+  bars.forEach(function(b){ b.classList.toggle('anim', on); });
+  document.getElementById('speechLabel').textContent = on ? 'Gesproken uitleg speelt...' : 'Klaar voor volgende slide';
+}
+
+function speak(text, onEnd) {
+  if (!synth) { onEnd && onEnd(); return; }
+  synth.cancel();
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang = 'nl-NL';
+  u.rate = 0.95;
+  u.pitch = 1.0;
+
+  // Pick a Dutch voice if available
+  var voices = synth.getVoices();
+  var nlVoice = voices.find(function(v){ return v.lang && v.lang.startsWith('nl'); });
+  if (nlVoice) u.voice = nlVoice;
+
+  u.onstart = function(){ setWave(true); };
+  u.onend   = function(){ setWave(false); onEnd && onEnd(); };
+  u.onerror = function(){ setWave(false); onEnd && onEnd(); };
+  synth.speak(u);
+}
+
+// ── AUTO PLAY ────────────────────────────────────────────────────────────────
+function runSlide(n) {
+  if (!playing) return;
+  cur = n;
+  showSlide(n);
+  speak(slides[n].speech, function() {
+    if (!playing) return;
+    if (n < total - 1) {
+      // Small pause between slides
+      slideTimer = setTimeout(function(){ runSlide(n+1); }, 1200);
+    } else {
+      // End
+      playing = false;
+      document.getElementById('ctrlBtn').textContent = '↺ Opnieuw';
+      document.getElementById('ctrlBtn').className = 'ctrl-btn start';
+      document.getElementById('speechLabel').textContent = 'Presentatie voltooid';
+    }
+  });
+}
+
+function startShow() {
+  if (playing) {
+    // Pause
+    playing = false;
+    paused = true;
+    synth.pause();
+    clearTimeout(slideTimer);
+    document.getElementById('ctrlBtn').textContent = '▶ Hervatten';
+    document.getElementById('ctrlBtn').onclick = resumeShow;
+    setWave(false);
+    document.getElementById('speechLabel').textContent = 'Gepauzeerd';
+    return;
+  }
+  // Fresh start or restart
+  playing = true;
+  paused  = false;
+  synth.cancel();
+  document.getElementById('ctrlBtn').textContent = '⏸ Pauzeren';
+  document.getElementById('ctrlBtn').onclick = startShow;
+  runSlide(0);
+}
+
+function resumeShow() {
+  playing = true;
+  paused  = false;
+  document.getElementById('ctrlBtn').textContent = '⏸ Pauzeren';
+  document.getElementById('ctrlBtn').onclick = startShow;
+  // Re-speak current slide from beginning (browser API limitation)
+  runSlide(cur);
+}
+
+function jumpTo(n) {
+  synth.cancel();
+  clearTimeout(slideTimer);
+  cur = n;
+  runSlide(n);
+}
+
+// ── FLAGS ────────────────────────────────────────────────────────────────────
+function toggleFlag(n) {
+  flags[n] = !flags[n];
+  var btn   = document.getElementById('t'+n);
+  var badge = document.getElementById('fb'+n);
+  var row   = document.getElementById('fr'+n);
+  if (flags[n]) {
+    btn.className   = 'toggle-btn on';
+    badge.textContent = 'Zichtbaar';
+    badge.className = 'flag-badge vis';
+    row.classList.add('on-flag');
+  } else {
+    btn.className   = 'toggle-btn off';
+    badge.textContent = 'Verborgen';
+    badge.className = 'flag-badge hid';
+    row.classList.remove('on-flag');
+  }
+}
+
+// Load voices async (Chrome needs this)
+if (synth && synth.onvoiceschanged !== undefined) {
+  synth.onvoiceschanged = function(){ synth.getVoices(); };
+}
+
+// Init
+buildProgress();
+</script>
+</body>
+</html>
